@@ -26,49 +26,56 @@ class Parallel(object):
 	def run(self, sleep=0.1, info=False, shell=False, assign_proc=True):
 		running = 0
 		while True:
-			for i in range(self.p):
-				if self.slots[i] is None:
-					if self.queue:
-						cmd = self.queue.pop(0)
-						self.command[i] = cmd
-						print(">>> Running:", cmd)
-						if info:
-							self.slots[i] = subprocess.Popen(cmd, shell=shell)
-						else:
-							self.slots[i] = subprocess.Popen(
-								cmd,
-								stdout=subprocess.PIPE,
-								stderr=subprocess.PIPE,
-								shell=shell,
-							)
-						time.sleep(0.01)
-						running += 1
+			try:
+				for i in range(self.p):
+					if self.slots[i] is None:
+						if self.queue:
+							cmd = self.queue.pop(0)
+							self.command[i] = cmd
+							print(">>> Running:", cmd)
+							if info:
+								self.slots[i] = subprocess.Popen(cmd, shell=shell)
+							else:
+								self.slots[i] = subprocess.Popen(
+									cmd,
+									stdout=subprocess.PIPE,
+									stderr=subprocess.PIPE,
+									shell=shell,
+								)
+							time.sleep(0.01)
+							running += 1
 
-						ready = list(set(range(0, self.max_cores)) - set(self.cores))
-						index = random.choice(ready)
-						self.cores[i] = index
-						subprocess.run(
-							["taskset", "-cp", f"{index}", f"{self.slots[i].pid}"],
-							capture_output=False,
-						)
-				else:
-					ret = self.slots[i].poll()
-					if ret is not None:
-						if ret != 0:
-							print(f"Error {ret} with command {cmd}")
-							output, error = self.slots[i].communicate()
-							print(output)
-							print(error)
-							for j in range(self.p):
-								if self.slots[j] is not None:
-									self.slots[j].kill()
-							return
-						else:
-							print("<<< Exited:", self.command[i])
-							self.command[i] = None
-							self.slots[i] = None
-							self.cores[i] = None
-							running -= 1
-			if running == 0:
-				break
-			time.sleep(sleep)
+							ready = list(set(range(0, self.max_cores)) - set(self.cores))
+							index = random.choice(ready)
+							self.cores[i] = index
+							subprocess.run(
+								["taskset", "-cp", f"{index}", f"{self.slots[i].pid}"],
+								capture_output=False,
+							)
+					else:
+						ret = self.slots[i].poll()
+						if ret is not None:
+							if ret != 0:
+								print(f"Error {ret} with command {cmd}")
+								output, error = self.slots[i].communicate()
+								print(output)
+								print(error)
+								for j in range(self.p):
+									if self.slots[j] is not None:
+										self.slots[j].kill()
+								return
+							else:
+								print("<<< Exited:", self.command[i])
+								self.command[i] = None
+								self.slots[i] = None
+								self.cores[i] = None
+								running -= 1
+				if running == 0:
+					break
+				time.sleep(sleep)
+			except KeyboardInterrupt:
+				print('Killing...')
+				for j in range(self.p):
+					if self.slots[j] is not None:
+						self.slots[j].kill()
+				print('Killed by user')
