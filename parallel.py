@@ -1,4 +1,4 @@
-import subprocess, time, random, os, multiprocessing, re
+import subprocess, time, random, os, multiprocessing, re, psutil, platform
 from copy import deepcopy
 
 
@@ -25,12 +25,12 @@ class Parallel(object):
 
 	def _get_proper_core(self):
 		usage = psutil.cpu_percent(percpu=True)
-		usage = [(i, usage[i]) for i in range(0, len(usage[i]))]
+		usage = [(i, usage[i]) for i in range(0, len(usage))]
 		random.shuffle(usage)
 		usage.sort(key=lambda usage: usage[1])
 		return usage[0][0]
 
-	def run(self, assign_proc=True, log=False, shell=False):
+	def run(self, shell=False, assign_proc=True, log=False):
 		running = 0
 		while True:
 			try:
@@ -40,7 +40,7 @@ class Parallel(object):
 							cmd = self.queue.pop(0)
 							self.command[i] = cmd
 							print(">>> Running:", cmd)
-							if info:
+							if log:
 								self.slots[i] = subprocess.Popen(cmd, shell=shell)
 							else:
 								self.slots[i] = subprocess.Popen(
@@ -49,23 +49,19 @@ class Parallel(object):
 									stderr=subprocess.PIPE,
 									shell=shell,
 								)
-							time.sleep(0.01)
+							time.sleep(0.1)
 							running += 1
 
-							ready = list(
-								set(range(0, self.max_cores)) - set(self.cores)
-							)
-							index = random.choice(ready)
-							self.cores[i] = index
-							subprocess.run(
-								[
-									"taskset",
-									"-cp",
-									f"{self._get_proper_core()}",
-									f"{self.slots[i].pid}",
-								],
-								capture_output=False,
-							)
+							if platform.system() == "Linux":
+								subprocess.run(
+									[
+										"taskset",
+										"-cp",
+										f"{self._get_proper_core()}",
+										f"{self.slots[i].pid}",
+									],
+									capture_output=False,
+								)
 					else:
 						ret = self.slots[i].poll()
 						if ret is not None:
