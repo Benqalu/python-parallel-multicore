@@ -23,7 +23,14 @@ class Parallel(object):
 			cmd[i] = cmd[i].strip().split(" ")
 		self.queue.extend(cmd)
 
-	def run(self, sleep=0.1, info=False, shell=False, assign_proc=True):
+	def _get_proper_core(self):
+		usage=psutil.cpu_percent(percpu=True)
+		usage=[(i,usage[i]) for i in range(0,len(usage[i]))]
+		random.shuffle(usage)
+		usage.sort(key=lambda usage:usage[1])
+		return usage[0][0]
+
+	def run(self, assign_proc=True, log=False, shell=False):
 		running = 0
 		while True:
 			try:
@@ -49,7 +56,7 @@ class Parallel(object):
 							index = random.choice(ready)
 							self.cores[i] = index
 							subprocess.run(
-								["taskset", "-cp", f"{index}", f"{self.slots[i].pid}"],
+								["taskset", "-cp", f"{self._get_proper_core()}", f"{self.slots[i].pid}"],
 								capture_output=False,
 							)
 					else:
@@ -72,7 +79,7 @@ class Parallel(object):
 								running -= 1
 				if running == 0:
 					break
-				time.sleep(sleep)
+				time.sleep(0.1)
 			except KeyboardInterrupt:
 				print('Killing...')
 				for j in range(self.p):
