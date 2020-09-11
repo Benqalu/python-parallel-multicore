@@ -24,10 +24,10 @@ class Parallel(object):
 		self.queue.extend(cmd)
 
 	def _get_proper_core(self):
-		usage=psutil.cpu_percent(percpu=True)
-		usage=[(i,usage[i]) for i in range(0,len(usage[i]))]
+		usage = psutil.cpu_percent(percpu=True)
+		usage = [(i, usage[i]) for i in range(0, len(usage[i]))]
 		random.shuffle(usage)
-		usage.sort(key=lambda usage:usage[1])
+		usage.sort(key=lambda usage: usage[1])
 		return usage[0][0]
 
 	def run(self, assign_proc=True, log=False, shell=False):
@@ -52,11 +52,18 @@ class Parallel(object):
 							time.sleep(0.01)
 							running += 1
 
-							ready = list(set(range(0, self.max_cores)) - set(self.cores))
+							ready = list(
+								set(range(0, self.max_cores)) - set(self.cores)
+							)
 							index = random.choice(ready)
 							self.cores[i] = index
 							subprocess.run(
-								["taskset", "-cp", f"{self._get_proper_core()}", f"{self.slots[i].pid}"],
+								[
+									"taskset",
+									"-cp",
+									f"{self._get_proper_core()}",
+									f"{self.slots[i].pid}",
+								],
 								capture_output=False,
 							)
 					else:
@@ -81,8 +88,8 @@ class Parallel(object):
 					break
 				time.sleep(0.1)
 			except KeyboardInterrupt:
-				print('Killing...')
+				print("Killing...")
 				for j in range(self.p):
 					if self.slots[j] is not None:
 						self.slots[j].kill()
-				print('Killed by user')
+				print("Killed by user")
